@@ -79,17 +79,8 @@
       return;
     }
 
-    // Sök avgångar för imorgon samma tid
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const yyyy = tomorrow.getFullYear();
-    const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
-    const dd = String(tomorrow.getDate()).padStart(2, '0');
-    const hh = String(tomorrow.getHours()).padStart(2, '0');
-    const min = String(tomorrow.getMinutes()).padStart(2, '0');
-
-    const dateTime = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    // Sök avgångar för 28 april från kl 06:00
+    const dateTime = `2026-04-28T06:00`;
 
     const url = `https://realtime-api.trafiklab.se/v1/departures/${stopId}/${dateTime}?key=${API_KEY}`;
 
