@@ -150,7 +150,7 @@ const TRAVEL_MIN = 70;
 // Stop IDs from Trafiklab Realtime API
 const STOPS = {
   stromkajen: '740020691',
-  alstaket:   '740026591'
+  alstaket:   '740077244'
 };
 
 let dir = 0, selDate = null, dates = [];
@@ -194,39 +194,59 @@ function buildDates() {
   });
 }
 
+async function fetchAt(stopId, dateTime) {
+  const url = 'https://realtime-api.trafiklab.se/v1/departures/'
+    + stopId + '/' + dateTime + '?key=' + API_KEY + '&limit=10';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  return (data.departures || []).filter(d => String(d.route && d.route.designation || '') === '84');
+}
+
 async function load() {
-  document.getElementById('content').innerHTML = '<div class="loading">Hämtar avgångar…</div>';
+  document.getElementById('content').innerHTML = '<div class="loading">Hämtar avgångar...</div>';
   const d = DIRS[dir];
   const isToday = selDate === dates[0].iso;
   const now = new Date();
-
-  // For today start slightly before now, for other dates start at midnight
-  const startDt = isToday
-    ? new Date(now.getTime() - 5 * 60000)
-    : new Date(selDate + 'T00:00:00');
-
-  const hh = String(startDt.getHours()).padStart(2,'0');
-  const mm = String(startDt.getMinutes()).padStart(2,'0');
-  const dateTimeParam = selDate + 'T' + hh + ':' + mm;
+  const stopId = STOPS[d.from];
 
   try {
-    const url = 'https://realtime-api.trafiklab.se/v1/departures/'
-      + STOPS[d.from] + '/' + dateTimeParam
-      + '?key=' + API_KEY;
+    // Sequential fetching: start at 06:00 (or now), then step forward after each found departure
+    // This avoids rate limiting while still finding all boats
+    const seen = new Set();
+    const deps = [];
+    const startHour = isToday ? Math.max(now.getHours() - 1, 5) : 5;
+    let nextTime = selDate + 'T' + String(startHour).padStart(2,'0') + ':00';
+    const endTime = selDate + 'T22:00';
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    // API returns 1 departure per call - fetch sequentially, jumping 30min after each found boat
+    for (let i = 0; i < 20; i++) {
+      if (nextTime >= endTime) break;
+      await new Promise(r => setTimeout(r, 150)); // avoid rate limiting
+      const batch = await fetchAt(stopId, nextTime).catch(() => []);
+      if (batch.length > 0) {
+        for (const dep of batch) {
+          const key = (dep.trip && dep.trip.trip_id) || dep.scheduled;
+          if (!seen.has(key)) { seen.add(key); deps.push(dep); }
+        }
+        // Jump just 1 minute past the found departure to catch the next one
+        const foundDt = new Date(batch[0].scheduled);
+        foundDt.setMinutes(foundDt.getMinutes() + 1);
+        nextTime = selDate + 'T'
+          + String(foundDt.getHours()).padStart(2,'0') + ':'
+          + String(foundDt.getMinutes()).padStart(2,'0');
+      } else {
+        // No boat found, jump 1 hour forward
+        const dt = new Date(selDate + 'T' + nextTime.slice(11));
+        dt.setHours(dt.getHours() + 1);
+        nextTime = selDate + 'T'
+          + String(dt.getHours()).padStart(2,'0') + ':00';
+      }
+    }
 
-    // Filter to line 84 going the right direction
-    const toNameLower = d.toName.toLowerCase();
-    const deps = (data.departures || []).filter(dep => {
-      const designation = String(dep.route?.designation || '');
-      const direction   = (dep.route?.direction || '').toLowerCase();
-      return designation === '84' && direction.includes(toNameLower.slice(0,5));
-    });
-
+    deps.sort(function(a,b) { return (a.scheduled||'').localeCompare(b.scheduled||''); });
     render(deps, isToday, d.toName);
+
   } catch(e) {
     console.warn('API error:', e);
     document.getElementById('content').innerHTML =
@@ -234,6 +254,7 @@ async function load() {
       + ' eller se aktuella tider på <a href="https://sl.se" target="_blank">sl.se</a>.</div>';
   }
 }
+
 
 function addMinutes(isoDateTime, mins) {
   const dt = new Date(isoDateTime);
@@ -272,7 +293,7 @@ function render(deps, isToday, toName) {
     const schTime = fmtTime(scheduled);
     const arrTime = addMinutes(realtime, TRAVEL_MIN);
 
-    const minsLeft = isNext ? Math.round((depMs - nowMs) / 60000) : null;
+    const minsLeft = (isNext && isToday) ? Math.round((depMs - nowMs) / 60000) : null;
     const cdStr = minsLeft === null ? ''
       : minsLeft < 1 ? 'Nu!'
       : minsLeft < 60 ? 'om ' + minsLeft + ' min'
