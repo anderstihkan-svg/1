@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>SIRI Debug</title></head>
+<body style="font-family:monospace;padding:20px;font-size:12px;line-height:1.8">
+<h2>SIRI – linje 84 test</h2>
+<div id="out"></div>
+<script>
+const KEY = '87740f95eab1432c92bbeaa70ba0177d';
+const el = document.getElementById('out');
+const log = s => { el.innerHTML += '<p>' + s + '</p>'; };
+ 
+async function test(label, url) {
+  log('<b>' + label + '</b>');
+  log('URL: ' + url);
+  try {
+    const res = await fetch(url);
+    log('Status: ' + res.status);
+    const text = await res.text();
+    log('<pre style="background:#f4f4f4;padding:8px;overflow:auto;max-height:300px">' + text.slice(0,1000) + '</pre>');
+  } catch(e) {
+    log('<span style="color:red">FEL: ' + e.message + '</span>');
+  }
+  log('<hr>');
+}
+ 
+// SIRI Stop Monitoring – avgångar från en hållplats
+// Strömkajen stop ID
+test('SIRI StopMonitoring Strömkajen',
+  'https://ext-api.trafiklab.se/sg/siri-sm/v2/siri/2.0/stop-monitoring?Key='+KEY+'&MonitoringRef=740020691&MaximumStopVisits=20');
+ 
+test('SIRI StopMonitoring Ålstäket',
+  'https://ext-api.trafiklab.se/sg/siri-sm/v2/siri/2.0/stop-monitoring?Key='+KEY+'&MonitoringRef=740077244&MaximumStopVisits=20');
+</script>
+</body></html>
+ 
