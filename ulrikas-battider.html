@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Ulrikas båttider</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #f0f4f8; min-height: 100vh; font-family: -apple-system, 'Helvetica Neue', sans-serif; }
+.app { max-width: 390px; margin: 0 auto; background: #fff; min-height: 100vh; }
+
+/* Banner */
+.banner {
+  padding: 16px 16px 14px;
+  background: #1A5FA8;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.banner-boat {
+  flex-shrink: 0;
+  animation: bob 2.6s ease-in-out infinite;
+  display: block;
+}
+@keyframes bob {
+  0%,100% { transform: translateY(0px) rotate(-1deg); }
+  50%      { transform: translateY(-5px) rotate(1deg); }
+}
+.banner-text { color: #fff; }
+.banner-title { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.1; }
+.banner-sub   { font-size: 13px; opacity: 0.75; margin-top: 3px; }
+
+/* Header */
+.header { padding: 16px 16px 12px; border-bottom: 1px solid #e8edf2; }
+.line-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #1A5FA8; color: #fff;
+  font-size: 13px; font-weight: 500;
+  padding: 4px 10px; border-radius: 6px; margin-bottom: 10px;
+}
+.direction-row { display: flex; align-items: center; gap: 8px; }
+.station { font-size: 24px; font-weight: 600; color: #0d1b2a; line-height: 1.1; }
+.dest-row { font-size: 14px; color: #6b7f94; margin-top: 3px; }
+.swap-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1.5px solid #d0dae4;
+  background: #f4f7fa;
+  cursor: pointer; font-size: 20px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.15s;
+}
+.swap-btn:hover { background: #e6ecf2; }
+.swap-btn:active { transform: scale(0.95); }
+
+/* Date chips */
+.date-row {
+  display: flex; gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid #e8edf2;
+}
+.date-row::-webkit-scrollbar { display: none; }
+.date-chip {
+  flex-shrink: 0; padding: 7px 15px;
+  border-radius: 20px; border: 1px solid #d0dae4;
+  font-size: 14px; cursor: pointer;
+  background: #fff; color: #0d1b2a;
+  white-space: nowrap; transition: background 0.12s;
+}
+.date-chip.active { background: #1A5FA8; color: #fff; border-color: #1A5FA8; }
+
+/* Departures */
+.departures { padding: 0 16px 16px; }
+.section-label {
+  font-size: 11px; color: #9aaab8;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  padding: 14px 0 8px;
+}
+.trip-card {
+  display: flex; align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid #e8edf2;
+  gap: 10px;
+}
+.trip-card.past { opacity: 0.35; }
+.time-col { min-width: 62px; }
+.dep-time { font-size: 30px; font-weight: 600; color: #0d1b2a; line-height: 1; }
+.arr-time { font-size: 13px; color: #6b7f94; margin-top: 4px; }
+.arrow-mid { color: #b0bec8; font-size: 14px; flex-shrink: 0; }
+.dest-col { flex: 1; }
+.dest-name { font-size: 15px; color: #0d1b2a; }
+.duration  { font-size: 13px; color: #6b7f94; margin-top: 2px; }
+.countdown { font-size: 13px; color: #185FA5; text-align: right; flex-shrink: 0; min-width: 60px; }
+.countdown.soon { color: #2a7d3f; font-weight: 600; font-size: 14px; }
+
+/* States */
+.loading { text-align: center; padding: 52px 16px; color: #6b7f94; font-size: 16px; }
+.empty   { padding: 36px 16px; text-align: center; color: #6b7f94; font-size: 16px; }
+.fallback-note {
+  margin: 4px 16px 0; padding: 10px 12px;
+  border-radius: 8px; background: #f4f7fa;
+  font-size: 12px; color: #9aaab8;
+}
+.info-box {
+  margin: 0 16px 20px; padding: 10px 12px;
+  border-radius: 8px; background: #f4f7fa;
+  font-size: 13px; color: #6b7f94;
+  display: flex; gap: 8px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Banner with custom SVG boat -->
+  <div class="banner">
+    <svg class="banner-boat" width="54" height="38" viewBox="0 0 54 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Water waves -->
+      <path d="M2 32 Q8 29 14 32 Q20 35 26 32 Q32 29 38 32 Q44 35 50 32" stroke="rgba(255,255,255,0.4)" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <!-- Hull -->
+      <path d="M8 26 L10 33 Q27 37 44 33 L46 26 Z" fill="#fff"/>
+      <!-- Hull shade -->
+      <path d="M8 26 L10 33 Q27 37 44 33 L46 26 Z" fill="rgba(26,95,168,0.08)"/>
+      <!-- Hull outline -->
+      <path d="M8 26 L10 33 Q27 37 44 33 L46 26" stroke="rgba(255,255,255,0.6)" stroke-width="1" fill="none"/>
+      <!-- Deck / cabin base -->
+      <rect x="14" y="18" width="26" height="10" rx="2" fill="rgba(255,255,255,0.92)"/>
+      <!-- Cabin windows -->
+      <rect x="17" y="21" width="5" height="4" rx="1" fill="#1A5FA8"/>
+      <rect x="24" y="21" width="5" height="4" rx="1" fill="#1A5FA8"/>
+      <rect x="31" y="21" width="5" height="4" rx="1" fill="#1A5FA8"/>
+      <!-- Funnel / chimney -->
+      <rect x="28" y="11" width="5" height="9" rx="1" fill="rgba(255,255,255,0.85)"/>
+      <!-- Smoke puffs -->
+      <circle cx="30" cy="9"  r="2"   fill="rgba(255,255,255,0.5)"/>
+      <circle cx="32" cy="6"  r="2.5" fill="rgba(255,255,255,0.35)"/>
+      <circle cx="29" cy="4"  r="1.8" fill="rgba(255,255,255,0.2)"/>
+      <!-- Mast flag -->
+      <line x1="20" y1="8" x2="20" y2="19" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
+      <path d="M20 8 L26 11 L20 14 Z" fill="rgba(255,200,0,0.85)"/>
+    </svg>
+    <div class="banner-text">
+      <div class="banner-title">Ulrikas båttider</div>
+      <div class="banner-sub">SL Linje 84 · Strömkajen–Ålstäket</div>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="line-badge">⛴ Linje 84</div>
+    <div class="direction-row">
+      <div style="flex:1">
+        <div class="station" id="from-name">Strömkajen</div>
+        <div class="dest-row">→ <span id="to-name">Ålstäket</span></div>
+      </div>
+      <button class="swap-btn" onclick="swapDir()" title="Byt riktning">⇄</button>
+    </div>
+  </div>
+
+  <div class="date-row" id="date-row"></div>
+  <div id="content"><div class="loading">Hämtar avgångar…</div></div>
+  <div class="info-box"><span>ⓘ</span><span>Restid ca 70 min · SL-biljett gäller · Cykel i mån av plats</span></div>
+</div>
+
+<script>
+const API_KEY = '83e66b71-70e0-4ded-8064-a1cd7e04a124';
+const STOPS = { stromkajen: '740098001', alstaket: '740098547' };
+let dir = 0, selDate = null, dates = [];
+const DIRS = [
+  { from:'stromkajen', to:'alstaket',   fromName:'Strömkajen', toName:'Ålstäket' },
+  { from:'alstaket',   to:'stromkajen', fromName:'Ålstäket',   toName:'Strömkajen' }
+];
+
+function swapDir() {
+  dir = 1 - dir;
+  document.getElementById('from-name').textContent = DIRS[dir].fromName;
+  document.getElementById('to-name').textContent   = DIRS[dir].toName;
+  load();
+}
+
+function buildDates() {
+  dates = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days   = ['Sön','Mån','Tis','Ons','Tor','Fre','Lör'];
+  const months = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const iso   = d.toISOString().slice(0,10);
+    const label = i===0 ? 'Idag' : i===1 ? 'Imorgon' : days[d.getDay()]+' '+d.getDate()+' '+months[d.getMonth()];
+    dates.push({ iso, label, d });
+  }
+  selDate = dates[0].iso;
+  const row = document.getElementById('date-row');
+  row.innerHTML = '';
+  dates.forEach((d,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'date-chip'+(i===0?' active':'');
+    btn.textContent = d.label;
+    btn.onclick = () => {
+      selDate = d.iso;
+      document.querySelectorAll('.date-chip').forEach((c,j) => c.classList.toggle('active', j===i));
+      load();
+    };
+    row.appendChild(btn);
+  });
+}
+
+async function load() {
+  document.getElementById('content').innerHTML = '<div class="loading">Hämtar avgångar…</div>';
+  const d = DIRS[dir];
+  const isToday = selDate === dates[0].iso;
+  const now = new Date();
+  const timeStr = isToday
+    ? String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')
+    : '00:00';
+  const dateStr = selDate.replace(/-/g,'');
+  try {
+    const url = `https://api.resrobot.se/v2.1/trip?format=json&originId=${STOPS[d.from]}&destId=${STOPS[d.to]}&date=${dateStr}&time=${timeStr}&numTrips=14&passlist=0&showPassingPoints=0&accessId=${API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    render(data.Trip || [], isToday, d.toName);
+  } catch(e) {
+    fallback(isToday, d.toName);
+  }
+}
+
+function render(trips, isToday, toName) {
+  if (!trips.length) { fallback(isToday, toName); return; }
+  const nowMs = Date.now();
+  let html = '', nextShown = false;
+  trips.forEach(trip => {
+    const legs = Array.isArray(trip.LegList?.Leg) ? trip.LegList.Leg : [trip.LegList?.Leg].filter(Boolean);
+    if (!legs.length) return;
+    const first = legs[0], last = legs[legs.length-1];
+    const depTime = first.Origin?.time?.slice(0,5)||'';
+    const arrTime = last.Destination?.time?.slice(0,5)||'';
+    if (!depTime) return;
+    const depMs = new Date((first.Origin.date||selDate)+'T'+first.Origin.time).getTime();
+    const arrMs = new Date((last.Destination.date||selDate)+'T'+last.Destination.time).getTime();
+    const dur = Math.round((arrMs-depMs)/60000);
+    const isPast = isToday && depMs < nowMs - 30000;
+    const isNext = !isPast && !nextShown;
+    if (isNext) nextShown = true;
+    const minsLeft = isNext ? Math.round((depMs-nowMs)/60000) : null;
+    const cdStr = minsLeft===null ? '' : minsLeft<1 ? 'Nu!' : minsLeft<60 ? `om ${minsLeft} min` : `om ${Math.floor(minsLeft/60)}h ${minsLeft%60}m`;
+    const isSoon = minsLeft!==null && minsLeft<15;
+    html += `<div class="trip-card${isPast?' past':''}">
+      <div class="time-col"><div class="dep-time">${depTime}</div><div class="arr-time">ank ${arrTime}</div></div>
+      <div class="arrow-mid">→</div>
+      <div class="dest-col"><div class="dest-name">${toName}</div><div class="duration">${dur} min</div></div>
+      ${isNext ? `<div class="countdown${isSoon?' soon':''}">${cdStr}</div>` : ''}
+    </div>`;
+  });
+  document.getElementById('content').innerHTML = html
+    ? `<div class="departures"><div class="section-label">Avgångar${isToday?' idag':' '+selDate}</div>${html}</div>`
+    : '<div class="empty">Inga avgångar hittades.</div>';
+}
+
+function fallback(isToday, toName) {
+  const dObj = dates.find(d => d.iso===selDate);
+  const dow = dObj ? dObj.d.getDay() : new Date().getDay();
+  const isWE = dow===0 || dow===6;
+  const nowMs = Date.now();
+  const sched = dir===0
+    ? (isWE ? [['09:15','10:25'],['12:30','13:40'],['15:30','16:40']]
+             : [['07:30','08:40'],['09:00','10:10'],['11:00','12:10'],['13:15','14:25'],['15:45','16:55'],['18:00','19:10'],['20:15','21:25']])
+    : (isWE ? [['08:00','09:10'],['11:15','12:25'],['14:30','15:40']]
+             : [['06:15','07:25'],['07:45','08:55'],['09:45','10:55'],['12:00','13:10'],['14:30','15:40'],['16:45','17:55'],['19:00','20:10']]);
+  let html = '', nextShown = false;
+  sched.forEach(([dep,arr]) => {
+    const depMs = new Date(selDate+'T'+dep+':00').getTime();
+    const isPast = isToday && depMs < nowMs - 30000;
+    const isNext = !isPast && !nextShown;
+    if (isNext) nextShown = true;
+    const minsLeft = isNext ? Math.round((depMs-nowMs)/60000) : null;
+    const cdStr = minsLeft===null ? '' : minsLeft<1 ? 'Nu!' : minsLeft<60 ? `om ${minsLeft} min` : `om ${Math.floor(minsLeft/60)}h ${minsLeft%60}m`;
+    const isSoon = minsLeft!==null && minsLeft<15;
+    html += `<div class="trip-card${isPast?' past':''}">
+      <div class="time-col"><div class="dep-time">${dep}</div><div class="arr-time">ank ${arr}</div></div>
+      <div class="arrow-mid">→</div>
+      <div class="dest-col"><div class="dest-name">${toName}</div><div class="duration">70 min</div></div>
+      ${isNext ? `<div class="countdown${isSoon?' soon':''}">${cdStr}</div>` : ''}
+    </div>`;
+  });
+  document.getElementById('content').innerHTML =
+    `<div class="departures"><div class="section-label">Avgångar${isToday?' idag':' '+selDate}</div>${html}</div>`+
+    `<div class="fallback-note">Offlinetidtabell – kontrollera sl.se för realtid</div>`;
+}
+
+buildDates();
+load();
+setInterval(() => { if (selDate === dates[0]?.iso) load(); }, 60000);
+</script>
+</body>
+</html>
