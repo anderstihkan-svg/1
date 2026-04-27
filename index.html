@@ -70,6 +70,7 @@ html, body { background: #f0f4f8; min-height: 100vh; font-family: -apple-system,
 .trip-card.past { opacity: 0.35; }
 .time-col { min-width: 62px; }
 .dep-time { font-size: 30px; font-weight: 600; color: #0d1b2a; line-height: 1; }
+.dep-time.realtime { color: #1a7a3a; }
 .arr-time { font-size: 13px; color: #6b7f94; margin-top: 4px; }
 .arrow-mid { color: #b0bec8; font-size: 14px; flex-shrink: 0; }
 .dest-col { flex: 1; }
@@ -77,6 +78,7 @@ html, body { background: #f0f4f8; min-height: 100vh; font-family: -apple-system,
 .duration  { font-size: 13px; color: #6b7f94; margin-top: 2px; }
 .countdown { font-size: 13px; color: #185FA5; text-align: right; flex-shrink: 0; min-width: 60px; }
 .countdown.soon { color: #2a7d3f; font-weight: 600; font-size: 14px; }
+.delay-badge { font-size: 11px; color: #b85c00; background: #fff3e0; padding: 2px 6px; border-radius: 4px; margin-top: 3px; display: inline-block; }
 
 .loading { text-align: center; padding: 52px 16px; color: #6b7f94; font-size: 16px; }
 .empty   { padding: 36px 16px; text-align: center; color: #6b7f94; font-size: 16px; }
@@ -90,8 +92,13 @@ html, body { background: #f0f4f8; min-height: 100vh; font-family: -apple-system,
   margin: 0 16px 20px; padding: 10px 12px;
   border-radius: 8px; background: #f4f7fa;
   font-size: 13px; color: #6b7f94;
-  display: flex; gap: 8px;
+  display: flex; gap: 8px; align-items: flex-start;
 }
+.attribution {
+  text-align: center; padding: 8px 16px 20px;
+  font-size: 11px; color: #b0bec8;
+}
+.attribution a { color: #b0bec8; }
 </style>
 </head>
 <body>
@@ -133,15 +140,17 @@ html, body { background: #f0f4f8; min-height: 100vh; font-family: -apple-system,
   <div class="date-row" id="date-row"></div>
   <div id="content"><div class="loading">Hämtar avgångar…</div></div>
   <div class="info-box"><span>ⓘ</span><span>Restid ca 70 min · SL-biljett gäller · Cykel i mån av plats</span></div>
+  <div class="attribution">Data från <a href="https://trafiklab.se" target="_blank">Trafiklab.se</a></div>
 </div>
 
 <script>
-const API_KEY = '83e66b71-70e0-4ded-8064-a1cd7e04a124';
+const API_KEY = '2f966d9a3b944444bc377ed7d5e0556f';
 const TRAVEL_MIN = 70;
 
+// Stop IDs from Trafiklab Realtime API
 const STOPS = {
   stromkajen: '740020691',
-  alstaket:   '740077244'
+  alstaket:   '740026591'
 };
 
 let dir = 0, selDate = null, dates = [];
@@ -191,44 +200,50 @@ async function load() {
   const isToday = selDate === dates[0].iso;
   const now = new Date();
 
-  const startTime = isToday
+  // For today start slightly before now, for other dates start at midnight
+  const startDt = isToday
     ? new Date(now.getTime() - 5 * 60000)
     : new Date(selDate + 'T00:00:00');
 
-  const hh = String(startTime.getHours()).padStart(2,'0');
-  const mm = String(startTime.getMinutes()).padStart(2,'0');
-  const dateStr = selDate.replace(/-/g,'');
+  const hh = String(startDt.getHours()).padStart(2,'0');
+  const mm = String(startDt.getMinutes()).padStart(2,'0');
+  const dateTimeParam = selDate + 'T' + hh + ':' + mm;
 
   try {
-    const url = 'https://api.resrobot.se/v2.1/departureBoard?format=json'
-      + '&id=' + STOPS[d.from]
-      + '&date=' + dateStr
-      + '&time=' + hh + '%3A' + mm
-      + '&maxJourneys=50'
-      + '&accessId=' + API_KEY;
+    const url = 'https://realtime-api.trafiklab.se/v1/departures/'
+      + STOPS[d.from] + '/' + dateTimeParam
+      + '?key=' + API_KEY;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
-    // Filter to line 84 only
-    const deps = (data.Departure || []).filter(dep => {
-      const name = (dep.name || '').toLowerCase();
-      const line = String(dep.ProductAtStop?.line || dep.Product?.line || '');
-      return name.includes('84') || line === '84';
+    // Filter to line 84 going the right direction
+    const toNameLower = d.toName.toLowerCase();
+    const deps = (data.departures || []).filter(dep => {
+      const designation = String(dep.route?.designation || '');
+      const direction   = (dep.route?.direction || '').toLowerCase();
+      return designation === '84' && direction.includes(toNameLower.slice(0,5));
     });
 
     render(deps, isToday, d.toName);
   } catch(e) {
     console.warn('API error:', e);
-    showError(e);
+    document.getElementById('content').innerHTML =
+      '<div class="error-box">Kunde inte hämta avgångar. Kontrollera din internetanslutning'
+      + ' eller se aktuella tider på <a href="https://sl.se" target="_blank">sl.se</a>.</div>';
   }
 }
 
-function addMinutes(dateStr, timeStr, mins) {
-  const dt = new Date(dateStr + 'T' + timeStr.slice(0,5) + ':00');
+function addMinutes(isoDateTime, mins) {
+  const dt = new Date(isoDateTime);
   dt.setMinutes(dt.getMinutes() + mins);
   return String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+}
+
+function fmtTime(iso) {
+  if (!iso) return '--:--';
+  return iso.slice(11,16);
 }
 
 function render(deps, isToday, toName) {
@@ -242,17 +257,21 @@ function render(deps, isToday, toName) {
   let html = '', nextShown = false;
 
   deps.forEach(dep => {
-    const rawTime = dep.time || '';
-    const depTime = rawTime.slice(0,5);
-    const depDate = dep.date || selDate;
-    if (!depTime) return;
+    const scheduled  = dep.scheduled  || '';
+    const realtime   = dep.realtime   || scheduled;
+    const canceled   = dep.canceled   || false;
+    const delayMin   = dep.delay ? Math.round(dep.delay / 60) : 0;
+    const isRealtime = dep.is_realtime || false;
 
-    const depMs = new Date(depDate + 'T' + rawTime.slice(0,8)).getTime();
+    const depMs  = new Date(realtime).getTime();
     const isPast = isToday && depMs < nowMs - 30000;
-    const isNext = !isPast && !nextShown;
+    const isNext = !isPast && !nextShown && !canceled;
     if (isNext) nextShown = true;
 
-    const arrTime = addMinutes(depDate, rawTime, TRAVEL_MIN);
+    const depTime = fmtTime(realtime);
+    const schTime = fmtTime(scheduled);
+    const arrTime = addMinutes(realtime, TRAVEL_MIN);
+
     const minsLeft = isNext ? Math.round((depMs - nowMs) / 60000) : null;
     const cdStr = minsLeft === null ? ''
       : minsLeft < 1 ? 'Nu!'
@@ -260,9 +279,15 @@ function render(deps, isToday, toName) {
       : 'om ' + Math.floor(minsLeft/60) + 'h ' + (minsLeft%60) + 'm';
     const isSoon = minsLeft !== null && minsLeft < 15;
 
-    html += '<div class="trip-card' + (isPast ? ' past' : '') + '">'
+    const timeClass = isRealtime && delayMin === 0 ? ' realtime' : '';
+    const delayHtml = delayMin > 0
+      ? '<div class="delay-badge">+' + delayMin + ' min försenad</div>'
+      : canceled ? '<div class="delay-badge">Inställd</div>' : '';
+
+    html += '<div class="trip-card' + (isPast||canceled ? ' past' : '') + '">'
       + '<div class="time-col">'
-      +   '<div class="dep-time">' + depTime + '</div>'
+      +   '<div class="dep-time' + timeClass + '">' + depTime + '</div>'
+      +   delayHtml
       +   '<div class="arr-time">ank ' + arrTime + '</div>'
       + '</div>'
       + '<div class="arrow-mid">→</div>'
@@ -279,13 +304,6 @@ function render(deps, isToday, toName) {
         + (isToday ? ' idag' : ' ' + selDate)
         + '</div>' + html + '</div>'
     : '<div class="empty">Inga avgångar hittades.</div>';
-}
-
-function showError(e) {
-  document.getElementById('content').innerHTML =
-    '<div class="error-box">Kunde inte hämta avgångar. '
-    + 'Kontrollera din internetanslutning eller se aktuella tider på '
-    + '<a href="https://sl.se" target="_blank">sl.se</a>.</div>';
 }
 
 buildDates();
