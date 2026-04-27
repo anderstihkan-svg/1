@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>API Debug</title></head>
+<body style="font-family:monospace;padding:20px;font-size:14px">
+<h2>ResRobot API Debug</h2>
+<div id="out"></div>
+<script>
+const KEY = '83e66b71-70e0-4ded-8064-a1cd7e04a124';
+const log = s => { document.getElementById('out').innerHTML += '<p>' + s + '</p>'; };
+
+async function test(label, url) {
+  log('Testing: ' + label + '...');
+  try {
+    const res = await fetch(url);
+    const text = await res.text();
+    log('Status: ' + res.status);
+    log('CORS header: ' + (res.headers.get('access-control-allow-origin') || 'none'));
+    log('Body (first 300): ' + text.slice(0,300));
+  } catch(e) {
+    log('ERROR: ' + e.message);
+  }
+  log('---');
+}
+
+// Test 1: departureBoard
+test('departureBoard Strömkajen',
+  'https://api.resrobot.se/v2.1/departureBoard?format=json&id=740098001&maxJourneys=5&accessId=' + KEY);
+
+// Test 2: location search (simpler)
+test('location.name search',
+  'https://api.resrobot.se/v2.1/location.name?format=json&input=Stockholm&accessId=' + KEY);
+</script>
+</body></html>
