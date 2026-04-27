@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Trafiklab Realtime Debug</title></head>
+<body style="font-family:monospace;padding:20px;font-size:12px;line-height:1.8">
+<h2>Trafiklab Realtime – linje 84 test</h2>
+<div id="out"></div>
+<script>
+const KEY = '2f966d9a3b944444bc377ed7d5e0556f';
+const el = document.getElementById('out');
+const log = s => { el.innerHTML += '<p>' + s + '</p>'; };
+ 
+async function test(label, url) {
+  log('<b>' + label + '</b>');
+  log('URL: ' + url);
+  try {
+    const res = await fetch(url);
+    log('Status: ' + res.status);
+    const text = await res.text();
+    log('<pre style="background:#f4f4f4;padding:8px;overflow:auto;max-height:300px">' + text.slice(0,1500) + '</pre>');
+  } catch(e) {
+    log('<span style="color:red">FEL: ' + e.message + '</span>');
+  }
+  log('<hr>');
+}
+ 
+const now = new Date();
+const today = now.toISOString().slice(0,10);
+const hh = String(now.getHours()).padStart(2,'0');
+const mm = String(now.getMinutes()).padStart(2,'0');
+ 
+// Timetables endpoint – Strömkajen
+test('Timetables Strömkajen (740020691)',
+  'https://api.trafiklab.se/v1/timetables/departures/740020691?key='+KEY+'&limit=20');
+ 
+// Timetables endpoint – Ålstäket
+test('Timetables Ålstäket brygga (740077244)',
+  'https://api.trafiklab.se/v1/timetables/departures/740077244?key='+KEY+'&limit=20');
+</script>
+</body></html>
+ 
