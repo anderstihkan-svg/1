@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trafiklab Debug – Linje 84</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      line-height: 1.5;
+    }
+    h1 { margin-bottom: 10px; }
+    button {
+      padding: 10px 16px;
+      margin: 8px 8px 8px 0;
+      cursor: pointer;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 16px;
+      border-radius: 8px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Debug – Båtlinje 84</h1>
+<p>Test för att kontrollera att Trafiklab Realtime API fungerar för:</p>
+<ul>
+  <li>Strömkajen</li>
+  <li>Ålstäket</li>
+</ul>
+
+<p><strong>Steg 1:</strong> klicka först på “Sök hållplats-ID” för att hitta rätt area_id.</p>
+<p><strong>Steg 2:</strong> kopiera rätt ID till variablerna <code>STROMKAJEN_ID</code> och <code>ALSTAKET_ID</code>.</p>
+<p><strong>Steg 3:</strong> klicka på avgångsknapparna.</p>
+
+<button onclick="lookupStop('Strömkajen')">Sök hållplats-ID: Strömkajen</button>
+<button onclick="lookupStop('Ålstäket')">Sök hållplats-ID: Ålstäket</button>
+<br>
+<button onclick="getDepartures(STROMKAJEN_ID, 'Strömkajen')">Avgångar Strömkajen</button>
+<button onclick="getDepartures(ALSTAKET_ID, 'Ålstäket')">Avgångar Ålstäket</button>
+
+<pre id="output">Resultat visas här...</pre>
+
+<script>
+  const API_KEY = '2f966d9a3b944444bc377ed7d5e0556f';
+
+  // Fyll i dessa efter första sökningen
+  const STROMKAJEN_ID = '';
+  const ALSTAKET_ID = '';
+
+  const output = document.getElementById('output');
+
+  async function lookupStop(name) {
+    const url = `https://realtime-api.trafiklab.se/v1/stops/name/${encodeURIComponent(name)}?key=${API_KEY}`;
+
+    output.textContent = `Söker hållplats-ID för ${name}...`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log(data);
+      output.textContent = JSON.stringify(data, null, 2);
+    } catch (error) {
+      console.error(error);
+      output.textContent = 'Fel vid stop lookup: ' + error.message;
+    }
+  }
+
+  async function getDepartures(stopId, label) {
+    if (!stopId) {
+      output.textContent = `Fyll först i rätt area_id för ${label}.`;
+      return;
+    }
+
+    const url = `https://realtime-api.trafiklab.se/v1/departures/${stopId}?key=${API_KEY}`;
+
+    output.textContent = `Hämtar avgångar för ${label}...`;
+
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+
+      // Enkel filtrering för linje 84
+      const only84 = (data.departures || []).filter(dep =>
+        dep.route && String(dep.route.short_name || '').includes('84')
+      );
+
+      console.log('Alla avgångar:', data);
+      console.log('Endast linje 84:', only84);
+
+      output.textContent = JSON.stringify({
+        stop: label,
+        line84: only84,
+        raw: data
+      }, null, 2);
+    } catch (error) {
+      console.error(error);
+      output.textContent = 'Fel vid departures: ' + error.message;
+    }
+  }
+</script>
+
+</body>
+</html>
