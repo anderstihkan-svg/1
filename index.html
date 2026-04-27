@@ -140,8 +140,8 @@ const API_KEY = '83e66b71-70e0-4ded-8064-a1cd7e04a124';
 const TRAVEL_MIN = 70;
 
 const STOPS = {
-  stromkajen: '740098001',
-  alstaket:   '740098547'
+  stromkajen: '740020691',
+  alstaket:   '740077244'
 };
 
 let dir = 0, selDate = null, dates = [];
@@ -191,7 +191,6 @@ async function load() {
   const isToday = selDate === dates[0].iso;
   const now = new Date();
 
-  // Start slightly before now so we catch the very next departure
   const startTime = isToday
     ? new Date(now.getTime() - 5 * 60000)
     : new Date(selDate + 'T00:00:00');
@@ -212,22 +211,21 @@ async function load() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
-    // Keep only departures that are line 84
+    // Filter to line 84 only
     const deps = (data.Departure || []).filter(dep => {
-      const name = (dep.name || dep.ProductAtStop?.name || '').toLowerCase();
-      const line = (dep.ProductAtStop?.line || dep.Product?.line || '').toString();
+      const name = (dep.name || '').toLowerCase();
+      const line = String(dep.ProductAtStop?.line || dep.Product?.line || '');
       return name.includes('84') || line === '84';
     });
 
     render(deps, isToday, d.toName);
   } catch(e) {
     console.warn('API error:', e);
-    showError();
+    showError(e);
   }
 }
 
 function addMinutes(dateStr, timeStr, mins) {
-  // timeStr may be "HH:MM:SS" or "HH:MM"
   const dt = new Date(dateStr + 'T' + timeStr.slice(0,5) + ':00');
   dt.setMinutes(dt.getMinutes() + mins);
   return String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
@@ -272,7 +270,7 @@ function render(deps, isToday, toName) {
       +   '<div class="dest-name">' + toName + '</div>'
       +   '<div class="duration">' + TRAVEL_MIN + ' min</div>'
       + '</div>'
-      + (isNext ? '<div class="countdown' + (isSoon ? ' soon' : '') + '">' + cdStr + '</div>' : '')
+      + (isNext ? '<div class="countdown' + (isSoon?' soon':'') + '">' + cdStr + '</div>' : '')
       + '</div>';
   });
 
@@ -283,10 +281,11 @@ function render(deps, isToday, toName) {
     : '<div class="empty">Inga avgångar hittades.</div>';
 }
 
-function showError() {
+function showError(e) {
   document.getElementById('content').innerHTML =
-    '<div class="error-box">Kunde inte hämta avgångar. Kontrollera din internetanslutning'
-    + ' eller se aktuella tider på <a href="https://sl.se" target="_blank">sl.se</a>.</div>';
+    '<div class="error-box">Kunde inte hämta avgångar. '
+    + 'Kontrollera din internetanslutning eller se aktuella tider på '
+    + '<a href="https://sl.se" target="_blank">sl.se</a>.</div>';
 }
 
 buildDates();
